@@ -4,7 +4,7 @@ import filePath from "./filePath";
 import { Client } from "pg";
 
 const app = express();
-const client = new Client({ database: 'toDoList' });
+const client = new Client({ database: "toDoList" });
 client.connect();
 
 app.use(express.json());
@@ -28,8 +28,11 @@ app.get("/items", async (req, res) => {
 app.post("/items", async (req, res) => {
   const postData = req.body;
   if (typeof postData.task === "string" && postData.task !== "") {
-    const queryResult = await client.query("INSERT INTO todo_items (task, duedate) VALUES ($1, $2)", [postData.task, postData.dueDate])
-    const signature = queryResult.rows[0]
+    const queryResult = await client.query(
+      "INSERT INTO todo_items (task, duedate) VALUES ($1, $2)",
+      [postData.task, postData.dueDate]
+    );
+    const signature = queryResult.rows[0];
     res.status(201).json({
       status: "success",
       data: signature,
@@ -48,9 +51,12 @@ app.post("/items", async (req, res) => {
 app.get<{ id: string }>("/items/:id", async (req, res) => {
   const id = parseInt(req.params.id); // params are always string type
 
-  const queryResult = await client.query("SELECT * FROM todo_items WHERE id = $1", [id]);   //FIXME-TASK get the signature row from the db (match on id)
-  
-  const matchingSignature = queryResult.rows
+  const queryResult = await client.query(
+    "SELECT * FROM todo_items WHERE id = $1",
+    [id]
+  ); //FIXME-TASK get the signature row from the db (match on id)
+
+  const matchingSignature = queryResult.rows;
   if (!matchingSignature) {
     res.status(404).json(matchingSignature);
   } else {
@@ -62,7 +68,10 @@ app.get<{ id: string }>("/items/:id", async (req, res) => {
 app.delete("/items/:id", async (req, res) => {
   const id = parseInt(req.params.id); // params are string type
 
-  const queryResult = await client.query("DELETE FROM todo_items WHERE id = $1", [id]); ////FIXME-TASK: delete the row with given id from the db  
+  const queryResult = await client.query(
+    "DELETE FROM todo_items WHERE id = $1",
+    [id]
+  ); ////FIXME-TASK: delete the row with given id from the db
   const didRemove = queryResult.rowCount === 1;
 
   if (didRemove) {
@@ -86,12 +95,18 @@ app.put("/items/:id", async (req, res) => {
   if (typeof toDoData.task === "string" && toDoData.task !== "") {
     let queryResult;
     if (toDoData.dueDate) {
-      const values = [toDoData.task, toDoData.dueDate, id]
-      queryResult = await client.query("UPDATE todo_items SET task = $1, dueDate = $2 WHERE id = $3", values); //FIXME-TASK: update the signature with given id in the DB.
+      const values = [toDoData.task, toDoData.dueDate, id];
+      queryResult = await client.query(
+        "UPDATE todo_items SET task = $1, dueDate = $2 WHERE id = $3",
+        values
+      ); //FIXME-TASK: update the signature with given id in the DB.
     } else {
-      const values = [toDoData.task, id]
-      queryResult = await client.query("UPDATE todo_items SET task = $1 WHERE id = $2", values);
-    }  
+      const values = [toDoData.task, id];
+      queryResult = await client.query(
+        "UPDATE todo_items SET task = $1 WHERE id = $2",
+        values
+      );
+    }
 
     if (queryResult.rowCount === 1) {
       const updatedTask = queryResult.rows[0];
@@ -99,7 +114,7 @@ app.put("/items/:id", async (req, res) => {
         status: "success",
         data: {
           task: updatedTask,
-        }
+        },
       });
     } else {
       res.status(404).json({
@@ -108,7 +123,6 @@ app.put("/items/:id", async (req, res) => {
           id: "Could not find a task with that id identifier",
         },
       });
-
     }
   } else {
     res.status(400).json({
@@ -123,14 +137,17 @@ app.put("/items/:id", async (req, res) => {
 // Add functionality to complete a task or undo a completion
 app.put("/items/:id/complete", async (req, res) => {
   const id = parseInt(req.params.id);
-  const queryResult = await client.query("UPDATE todo_items SET completed = NOT completed WHERE id = $1", [id]); //FIXME-TASK: update the signature with given id in the DB. 
+  const queryResult = await client.query(
+    "UPDATE todo_items SET completed = NOT completed WHERE id = $1",
+    [id]
+  ); //FIXME-TASK: update the signature with given id in the DB.
   if (queryResult.rowCount === 1) {
     const updatedTask = queryResult.rows[0];
     res.status(200).json({
       status: "success",
       data: {
         task: updatedTask,
-      }
+      },
     });
   } else {
     res.status(404).json({

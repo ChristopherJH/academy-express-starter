@@ -120,6 +120,28 @@ app.put("/items/:id", async (req, res) => {
   }
 });
 
+// Add functionality to complete a task or undo a completion
+app.put("/items/:id/complete", async (req, res) => {
+  const id = parseInt(req.params.id);
+  const queryResult = await client.query("UPDATE todo_items SET completed = NOT completed WHERE id = $1", [id]); //FIXME-TASK: update the signature with given id in the DB. 
+  if (queryResult.rowCount === 1) {
+    const updatedTask = queryResult.rows[0];
+    res.status(200).json({
+      status: "success",
+      data: {
+        task: updatedTask,
+      }
+    });
+  } else {
+    res.status(404).json({
+      status: "fail",
+      data: {
+        id: "Could not find a task with that id identifier",
+      },
+    });
+  }
+});
+
 app.listen(PORT_NUMBER, () => {
   console.log(`Server is listening on port ${PORT_NUMBER}!`);
 });

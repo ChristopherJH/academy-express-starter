@@ -1,58 +1,57 @@
-import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
-import {
-  addDummyDbItems,
-  addDbItem,
-  getAllDbItems,
-  getDbItemById,
-  DbItem,
-  updateDbItemById,
-} from "./db";
+import express from "express";
 import filePath from "./filePath";
-
-// loading in some dummy items into the database
-// (comment out if desired, or change the number)
-addDummyDbItems(20);
+import { Client } from "pg";
 
 const app = express();
+const client = new Client({ database: 'toDoList' });
+client.connect();
 
-/** Parses JSON data in a request automatically */
 app.use(express.json());
-/** To allow 'Cross-Origin Resource Sharing': https://en.wikipedia.org/wiki/Cross-origin_resource_sharing */
 app.use(cors());
 
-// read in contents of any environment variables in the .env file
-dotenv.config();
-
-// use the environment variable PORT, or 4000 as a fallback
 const PORT_NUMBER = process.env.PORT ?? 4000;
 
-// API info page
 app.get("/", (req, res) => {
   const pathToFile = filePath("../public/index.html");
   res.sendFile(pathToFile);
 });
 
 // GET /items
-app.get("/items", (req, res) => {
-  const allSignatures = getAllDbItems();
-  res.status(200).json(allSignatures);
+app.get("/items", async (req, res) => {
+  const queryResult = await client.query("SELECT * from todo_items");
+  const allToDos = queryResult.rows;
+  res.status(200).json(allToDos);
 });
 
 // POST /items
-app.post<{}, {}, DbItem>("/items", (req, res) => {
-  // to be rigorous, ought to handle non-conforming request bodies
-  // ... but omitting this as a simplification
+app.post("/items", async (req, res) => {
   const postData = req.body;
-  const createdSignature = addDbItem(postData);
-  res.status(201).json(createdSignature);
+  if (typeof postData.task === "string" && postData.task !== "") {
+    const queryResult = await client.query("INSERT INTO todo_items (task, duedate) VALUES ($1, $2)", [postData.task, postData.dueDate])
+    const signature = queryResult.rows[0]
+    res.status(201).json({
+      status: "success",
+      data: signature,
+    });
+  } else {
+    res.status(400).json({
+      status: "fail",
+      data: {
+        name: "A string value for task is required in your JSON body",
+      },
+    });
+  }
 });
 
 // GET /items/:id
-app.get<{ id: string }>("/items/:id", (req, res) => {
-  const matchingSignature = getDbItemById(parseInt(req.params.id));
-  if (matchingSignature === "not found") {
+app.get<{ id: string }>("/items/:id", async (req, res) => {
+  const id = parseInt(req.params.id); // params are always string type
+
+  const queryResult = await client.query("SELECT * FROM todo_items WHERE id = $1", [id]);   //FIXME-TASK get the signature row from the db (match on id)
+  
+  const matchingSignature = queryResult.rows
+  if (!matchingSignature) {
     res.status(404).json(matchingSignature);
   } else {
     res.status(200).json(matchingSignature);
@@ -60,22 +59,64 @@ app.get<{ id: string }>("/items/:id", (req, res) => {
 });
 
 // DELETE /items/:id
-app.delete<{ id: string }>("/items/:id", (req, res) => {
-  const matchingSignature = getDbItemById(parseInt(req.params.id));
-  if (matchingSignature === "not found") {
-    res.status(404).json(matchingSignature);
+app.delete("/items/:id", async (req, res) => {
+  const id = parseInt(req.params.id); // params are string type
+
+  const queryResult = await client.query("DELETE FROM todo_items WHERE id = $1", [id]); ////FIXME-TASK: delete the row with given id from the db  
+  const didRemove = queryResult.rowCount === 1;
+
+  if (didRemove) {
+    res.status(200).json({
+      status: "success",
+    });
   } else {
-    res.status(200).json(matchingSignature);
+    res.status(404).json({
+      status: "fail",
+      data: {
+        id: "Could not find a signature with that id identifier",
+      },
+    });
   }
 });
 
-// PATCH /items/:id
-app.patch<{ id: string }, {}, Partial<DbItem>>("/items/:id", (req, res) => {
-  const matchingSignature = updateDbItemById(parseInt(req.params.id), req.body);
-  if (matchingSignature === "not found") {
-    res.status(404).json(matchingSignature);
+app.put("/items/:id", async (req, res) => {
+  //  :id refers to a route parameter, which will be made available in req.params.id
+  const toDoData = req.body;
+  const id = parseInt(req.params.id);
+  if (typeof toDoData.task === "string" && toDoData.task !== "") {
+    let queryResult;
+    if (toDoData.dueDate) {
+      const values = [toDoData.task, toDoData.dueDate, id]
+      queryResult = await client.query("UPDATE todo_items SET task = $1, dueDate = $2 WHERE id = $3", values); //FIXME-TASK: update the signature with given id in the DB.
+    } else {
+      const values = [toDoData.task, id]
+      queryResult = await client.query("UPDATE todo_items SET task = $1 WHERE id = $2", values);
+    }  
+
+    if (queryResult.rowCount === 1) {
+      const updatedTask = queryResult.rows[0];
+      res.status(200).json({
+        status: "success",
+        data: {
+          task: updatedTask,
+        }
+      });
+    } else {
+      res.status(404).json({
+        status: "fail",
+        data: {
+          id: "Could not find a task with that id identifier",
+        },
+      });
+
+    }
   } else {
-    res.status(200).json(matchingSignature);
+    res.status(400).json({
+      status: "fail",
+      data: {
+        name: "A string value for task is required in your JSON body",
+      },
+    });
   }
 });
 

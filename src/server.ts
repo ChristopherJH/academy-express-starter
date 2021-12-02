@@ -2,8 +2,11 @@ import cors from "cors";
 import express from "express";
 import filePath from "./filePath";
 import { Client } from "pg";
+import dotenv from "dotenv";
 
 const app = express();
+dotenv.config();
+
 const client = new Client({ database: "toDoList" });
 client.connect();
 

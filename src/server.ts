@@ -27,7 +27,9 @@ app.get("/", (req, res) => {
 
 // GET /items
 app.get("/items", async (req, res) => {
-  const queryResult = await client.query("SELECT * from todo_items");
+  const queryResult = await client.query(
+    "SELECT * from todo_items ORDER BY creationdate DESC"
+  );
   const allToDos = queryResult.rows;
   res.status(200).json(allToDos);
 });
